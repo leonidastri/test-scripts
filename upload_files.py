@@ -23,10 +23,16 @@ def parse_args():
                         help=IPUT_PARAMS["resource"]["help"])
     parser.add_argument("--replicate", type=str,
                         help="Replicate uploaded data to this second resource.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Simulate actions without executing them.")
     return parser.parse_args()
 
-def ensure_irods_collection(path: str):
+def ensure_irods_collection(path: str, dry_run: bool):
     print(f"Ensuring iRODS collection '{path}' exists...")
+    if dry_run:
+        print(f"[DRY-RUN] Would run: imkdir -p {path}")
+        print(f"[DRY-RUN] Collection '{path}' assumed to exist.")
+        return
     try:
         subprocess.run(["imkdir", "-p", path], check=True, capture_output=True, text=True)
         print(f"Collection '{path}' exists or was created successfully.")
@@ -38,14 +44,13 @@ def ensure_irods_collection(path: str):
             print("STDERR:", e.stderr)
         sys.exit(1)
 
-def upload_folder_to_irods(local_folder: str, irods_path: str, resource: str = None):
+def upload_folder_to_irods(local_folder: str, irods_path: str, resource: str = None, dry_run: bool = False):
     if not os.path.isdir(local_folder):
         print(f"Error: Folder '{local_folder}' does not exist or is not a directory.", file=sys.stderr)
         sys.exit(1)
 
-    ensure_irods_collection(irods_path)
+    ensure_irods_collection(irods_path, dry_run)
 
-    # Upload the folder
     print(f"Uploading '{local_folder}' to iRODS path '{irods_path}'...")
     cmd = ["iput", "-r"]
     if resource:
@@ -53,46 +58,51 @@ def upload_folder_to_irods(local_folder: str, irods_path: str, resource: str = N
     cmd.extend([local_folder, irods_path])
 
     print(f"Running command: {' '.join(cmd)}")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        print(f"Successfully uploaded folder '{local_folder}' to '{irods_path}'")
-        if result.stdout:
-            print(result.stdout)
-    except subprocess.CalledProcessError as e:
-        print("iRODS upload failed!")
-        if e.stdout:
-            print("STDOUT:", e.stdout)
-        if e.stderr:
-            print("STDERR:", e.stderr)
-        sys.exit(1)
+    if dry_run:
+        print(f"[DRY-RUN] Skipping actual upload.")
+    else:
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print(f"Successfully uploaded folder '{local_folder}' to '{irods_path}'")
+            if result.stdout:
+                print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("iRODS upload failed!")
+            if e.stdout:
+                print("STDOUT:", e.stdout)
+            if e.stderr:
+                print("STDERR:", e.stderr)
+            sys.exit(1)
 
-    # return the irods path of the uploaded folder
     uploaded_folder_name = os.path.basename(os.path.normpath(local_folder))
     return os.path.join(irods_path, uploaded_folder_name)
 
-def replicate_to_resource(uploaded_folder_path: str, second_resource: str):
+def replicate_to_resource(uploaded_folder_path: str, second_resource: str, dry_run: bool):
     print(f"Replicating '{uploaded_folder_path}' to resource '{second_resource}'...")
     cmd = ["irepl", "-r", "-R", second_resource, uploaded_folder_path]
     print(f"Running command: {' '.join(cmd)}")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        print(f"Successfully replicated '{uploaded_folder_path}' to resource '{second_resource}'")
-        if result.stdout:
-            print(result.stdout)
-    except subprocess.CalledProcessError as e:
-        print("Replication failed!")
-        if e.stdout:
-            print("STDOUT:", e.stdout)
-        if e.stderr:
-            print("STDERR:", e.stderr)
-        sys.exit(1)
+    if dry_run:
+        print(f"[DRY-RUN] Skipping actual replication.")
+    else:
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print(f"Successfully replicated '{uploaded_folder_path}' to resource '{second_resource}'")
+            if result.stdout:
+                print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("Replication failed!")
+            if e.stdout:
+                print("STDOUT:", e.stdout)
+            if e.stderr:
+                print("STDERR:", e.stderr)
+            sys.exit(1)
 
 def main():
     args = parse_args()
     try:
-        uploaded_folder_path = upload_folder_to_irods(args.folder, args.irods_path, args.resource)
+        uploaded_folder_path = upload_folder_to_irods(args.folder, args.irods_path, args.resource, args.dry_run)
         if args.replicate:
-            replicate_to_resource(uploaded_folder_path, args.replicate)
+            replicate_to_resource(uploaded_folder_path, args.replicate, args.dry_run)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
