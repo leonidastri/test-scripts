@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument("--num-files", type=int, required=True, help="Total number of files (>20).")
     parser.add_argument("--path", type=str, required=True, help="Base path.")
     parser.add_argument("--folder", type=str, required=True, help="Folder name to create.")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate actions without actually creating files.")
     return parser.parse_args()
 
 
@@ -48,12 +49,15 @@ def write_file_in_chunks(file_path: str, size: int, is_text: bool = True):
                 remaining -= to_write
 
 
-def create_data_folder_with_files(total_size_bytes: int, num_files: int, base_path: str, folder_name: str):
+def create_data_folder_with_files(total_size_bytes: int, num_files: int, base_path: str, folder_name: str, dry_run: bool):
     if num_files <= 20:
         raise ValueError("Number of files must be greater than 20 (20 are reserved for BIN).")
 
     folder_path = os.path.join(os.path.abspath(base_path), folder_name)
-    os.makedirs(folder_path, exist_ok=True)
+    if dry_run:
+        print(f"[DRY-RUN] Would create folder: {folder_path}")
+    else:
+        os.makedirs(folder_path, exist_ok=True)
 
     num_bin = 20
     num_txt = num_files - num_bin
@@ -96,22 +100,28 @@ def create_data_folder_with_files(total_size_bytes: int, num_files: int, base_pa
     # Write TXT files
     for i, size in enumerate(txt_sizes, start=1):
         file_path = os.path.join(folder_path, f"irelocatetest_{i}.txt")
-        write_file_in_chunks(file_path, size, is_text=True)
+        if dry_run:
+            print(f"[DRY-RUN] Would create TXT: {file_path} ({size} bytes)")
+        else:
+            write_file_in_chunks(file_path, size, is_text=True)
 
     # Write BIN files
     for i, size in enumerate(bin_sizes, start=1):
-        file_path = os.path.join(folder_path, f"irelocatetest_bin_{i}.bin")
-        write_file_in_chunks(file_path, size, is_text=False)
+        file_path = os.path.join(folder_path, f"irelocatetest_{i}.bin")
+        if dry_run:
+            print(f"[DRY-RUN] Would create BIN: {file_path} ({size} bytes)")
+        else:
+            write_file_in_chunks(file_path, size, is_text=False)
 
     total_created = sum(txt_sizes) + sum(bin_sizes)
-    print(f"Created {len(txt_sizes)} TXT and {len(bin_sizes)} BIN files in '{folder_path}'.")
-    print(f"Total size created: {total_created} bytes ({total_created / 1024**2:.2f} MB).")
+    
+    print(f"{'[DRY-RUN]' if dry_run else ''} Total size planned: {total_created} bytes ({total_created / 1024**2:.2f} MB).")
 
 
 def main():
     args = parse_args()
     try:
-        create_data_folder_with_files(args.total_size, args.num_files, args.path, args.folder)
+        create_data_folder_with_files(args.total_size, args.num_files, args.path, args.folder, args.dry_run)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
