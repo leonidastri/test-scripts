@@ -33,19 +33,18 @@ def write_file_in_chunks(file_path: str, size: int, is_text: bool = True):
     remaining = size
 
     if is_text:
-        letters = string.ascii_letters
+        zero_chunk = "0" * chunk_size
         with open(file_path, "w", encoding="utf-8") as f:
             while remaining > 0:
                 to_write = min(remaining, chunk_size)
-                chunk = ''.join(random.choices(letters, k=to_write))
-                f.write(chunk)
+                f.write(zero_chunk[:to_write])
                 remaining -= to_write
     else:
         with open(file_path, "wb") as f:
-            chunk = b"\x00" * chunk_size
+            zero_chunk = b"\x00" * chunk_size
             while remaining > 0:
                 to_write = min(remaining, chunk_size)
-                f.write(chunk[:to_write])
+                f.write(zero_chunk[:to_write])
                 remaining -= to_write
 
 
